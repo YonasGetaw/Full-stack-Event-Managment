@@ -1,0 +1,205 @@
+🔐 Authentication Flow
+### Register User
+POST {{base_url}}/api/auth/register
+Content-Type: application/json
+{
+  "firstName": "Test",
+  "lastName": "User",
+  "email": "test@example.com",
+  "phone": "0912345678",
+  "password": "TestPass123!"
+}
+
+
+GET {{base_url}}/api/auth/verify-email?token=TOKEN_FROM_CONSOLE
+
+### login
+POST {{base_url}}/api/auth/login
+Content-Type: application/json
+
+# BY Using email
+{
+  "identifier": "test@example.com",
+  "password": "TestPass123!"
+}
+# BY Using Phone Number
+{
+  "identifier":"0910027807",
+  "password":"TestPass123!"
+}
+
+### Get User Profile
+
+GET {{base_url}}/api/users/me
+Authorization: Bearer {{accessToken}}
+
+
+📅 Booking Flow
+
+### CALCULATING 
+POST {{base_url}}/api/bookings/calc-price
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "eventType": "wedding",
+  "guestCount": 150,
+  "eventDate": "2025-12-15",
+  "eventTime": "18:00"
+}
+
+
+### Create bookings
+POST {{base_url}}/api/bookings
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "customerName": "Test User",
+  "customerEmail": "test@example.com",
+  "customerPhone": "0912345678",
+  "eventType": "wedding",
+  "eventDate": "2025-12-15",
+  "eventTime": "18:00",
+  "guestCount": 150,
+  "message": "Test booking"
+}
+
+### Proceed to Payment
+POST {{base_url}}/api/bookings/{{bookingId}}/proceed-payment
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "telebirr",
+  "phoneNumber": "0912345678"
+}
+
+### process payment
+POST {{base_url}}/api/payments/{{paymentId}}/process
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "simulateSuccess": true
+}
+
+
+### Get QR Code
+GET {{base_url}}/api/bookings/{{bookingId}}/qr
+Authorization: Bearer {{accessToken}}
+
+
+
+👑 Admin Functionality
+### Create Admin User
+-- Run in your database:
+UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
+
+
+### Login as Admin
+POST {{base_url}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin@eventbooking.com",
+  "password": "AdminPass123!"
+}
+
+### Get All Users (Admin)
+GET {{base_url}}/api/users/admin/users
+Authorization: Bearer {{adminAccessToken}}
+
+
+### Get Dashboard Metrics
+GET {{base_url}}/api/reports/admin/dashboard/metrics
+Authorization: Bearer {{adminAccessToken}}
+
+
+### Get All Bookings
+GET {{base_url}}/api/bookings/admin/bookings
+Authorization: Bearer {{adminAccessToken}}
+
+
+
+🖼 Services & Gallery
+### Get All Services
+
+GET {{base_url}}/api/services
+Authorization: Bearer {{accessToken}}
+
+### Create Service (Admin)
+POST {{base_url}}/api/services
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: multipart/form-data
+
+-- Form Data --
+name: Premium Catering
+description: Luxury catering service
+price: 25000
+category: catering
+featured: true
+images: [Select image files]
+
+
+### Get Gallery Items
+GET {{base_url}}/api/gallery
+Authorization: Bearer {{accessToken}}
+
+### Create Gallery Item (Admin)
+POST {{base_url}}/api/gallery
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: multipart/form-data
+
+-- Form Data --
+title: Beautiful Wedding
+description: Elegant wedding decoration
+category: wedding
+location: Addis Ababa
+date: 2024-01-15
+image: [Select image file]
+
+
+
+🔔 Notifications
+
+### Get Notifications
+GET {{base_url}}/api/notifications
+Authorization: Bearer {{accessToken}}
+
+### Mark as Read
+
+PATCH {{base_url}}/api/notifications/{{notificationId}}/read
+Authorization: Bearer {{accessToken}}
+
+🔄 Additional Tests
+
+### Refresh Token
+POST {{base_url}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Forget password
+POST {{base_url}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Reset password
+POST {{base_url}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "TOKEN_FROM_CONSOLE",
+  "newPassword": "NewPass123!"
+}
+
+### Log out
+
+POST {{base_url}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
