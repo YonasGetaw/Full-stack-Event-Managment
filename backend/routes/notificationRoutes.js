@@ -11,9 +11,10 @@ router.patch('/read-all', authenticateToken, notificationController.markAllAsRea
 router.delete('/:id', authenticateToken, notificationController.deleteNotification);
 
 // Admin only routes
-// router.get('/admin', authenticateToken, requireAdmin, notificationController.getAdminNotifications);
-// router.get('/admin/unread-count', authenticateToken, requireAdmin, notificationController.getAdminUnreadCount);
-// router.patch('/admin/:id/read', authenticateToken, requireAdmin, notificationController.markAdminNotificationAsRead);
-// router.patch('/admin/read-all', authenticateToken, requireAdmin, notificationController.markAllAdminNotificationsAsRead);
+router.post('/admin', authenticateToken, requireAdmin, notificationController.createAdminNotification);
+router.get('/admin', authenticateToken, requireAdmin, notificationController.getAdminNotifications);
+router.get('/admin/unread-count', authenticateToken, requireAdmin, notificationController.getAdminUnreadCount);
+router.patch('/admin/:id/read', authenticateToken, requireAdmin, notificationController.markAdminNotificationAsRead);
+router.patch('/admin/read-all', authenticateToken, requireAdmin, notificationController.markAllAdminNotificationsAsRead);
 
 module.exports = router;

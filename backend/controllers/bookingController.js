@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { Booking, Service, Payment, User, AuditLog, PricingRule, PaymentMethodConfig } = require('../models');
+const { Booking, Service, Payment, User, AuditLog, PricingRule, PaymentMethodConfig, Event } = require('../models');
 const { successResponse, errorResponse, validationErrorResponse } = require('../utils/response');
 const PaymentService = require('../services/paymentService');
 const EmailService = require('../services/emailService');
@@ -12,7 +12,7 @@ const calculatePriceSchema = Joi.object({
   eventType: Joi.string().valid('wedding', 'birthday', 'corporate', 'other').required(),
   guestCount: Joi.number().integer().min(1).max(1000).required(),
   durationHours: Joi.number().integer().min(1).default(5),
-  eventDate: Joi.date().min('now').required(),
+  eventDate: Joi.date().iso().required(),
   eventTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).required(),
 });
 
@@ -22,7 +22,7 @@ const createBookingSchema = Joi.object({
   customerEmail: Joi.string().email().required(),
   customerPhone: Joi.string().min(10).max(15).required(),
   eventType: Joi.string().valid('wedding', 'birthday', 'corporate', 'other').required(),
-  eventDate: Joi.date().min('now').required(),
+  eventDate: Joi.date().iso().required(),
   eventTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).required(),
   guestCount: Joi.number().integer().min(1).max(1000).required(),
   durationHours: Joi.number().integer().min(1).default(5),
@@ -178,6 +178,16 @@ const bookingController = {
         `New booking created by ${customerName}`,
         { bookingId: booking.id, customerName, customerEmail }
       );
+
+      // Notify user who made the booking (if logged in)
+      if (req.user?.id) {
+        await NotificationService.createNotification(
+          req.user.id,
+          'booking_created',
+          `Your ${eventType} booking has been created successfully. Booking ID: ${booking.id}`,
+          { bookingId: booking.id, eventType, customerName }
+        );
+      }
 
       // Send confirmation email
       await EmailService.sendBookingConfirmation(booking, req.user);
@@ -380,20 +390,58 @@ const bookingController = {
   },
 
   updateBookingStatus: async (req, res) => {
+    const transaction = await require('../config/database').sequelize.transaction();
+    
     try {
       const { id } = req.params;
       const { status } = req.body;
 
       if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+        await transaction.rollback();
         return errorResponse(res, 'Invalid status', 400);
       }
 
       const booking = await Booking.findByPk(id);
       if (!booking) {
+        await transaction.rollback();
         return errorResponse(res, 'Booking not found', 404);
       }
 
-      await booking.update({ status });
+      const oldStatus = booking.status;
+      await booking.update({ status }, { transaction });
+
+      // If booking is confirmed and payment is paid, create an event
+      let createdEvent = null;
+      if (status === 'confirmed' && booking.paymentStatus === 'paid') {
+        // Check if event already exists for this booking
+        const existingEvent = await Event.findOne({
+          where: { 
+            title: `${booking.eventType} - ${booking.customerName}`,
+            eventDate: booking.eventDate,
+            eventTime: booking.eventTime
+          },
+          transaction
+        });
+
+        if (!existingEvent) {
+          // Create event from booking
+          const eventData = {
+            title: `${booking.eventType} - ${booking.customerName}`,
+            description: booking.message || `Event created from booking for ${booking.customerName}. Contact: ${booking.customerPhone}`,
+            eventType: booking.eventType,
+            location: 'To be determined',
+            eventDate: booking.eventDate,
+            eventTime: booking.eventTime,
+            ticketPrice: Math.round(booking.priceCalculated / booking.guestCount), // Price per person
+            totalTickets: booking.guestCount,
+            status: 'published'
+          };
+
+          createdEvent = await Event.create(eventData, { transaction });
+          
+          logger.info(`Event created from booking ${booking.id}: Event ${createdEvent.id}`);
+        }
+      }
 
       // Log audit
       await AuditLog.create({
@@ -403,21 +451,43 @@ const bookingController = {
         resourceId: id,
         ip: req.ip,
         userAgent: req.get('User-Agent'),
-        data: { oldStatus: booking.status, newStatus: status }
-      });
+        data: { oldStatus, newStatus: status, createdEventId: createdEvent?.id }
+      }, { transaction });
 
       // Notify user if status changed to confirmed or cancelled
       if (status === 'confirmed' || status === 'cancelled') {
         await NotificationService.createNotification(
           booking.userId,
           `booking_${status}`,
-          `Your booking has been ${status}`,
-          { bookingId: id, status }
+          `Your booking has been ${status}${createdEvent ? ' and published as an event' : ''}`,
+          { bookingId: id, status, eventId: createdEvent?.id }
         );
       }
 
-      return successResponse(res, booking, 'Booking status updated successfully');
+      // Notify admins about event creation
+      if (createdEvent) {
+        await NotificationService.notifyAdmins(
+          'event_created',
+          `Event automatically created from confirmed booking: ${createdEvent.title}`,
+          { eventId: createdEvent.id, bookingId: booking.id }
+        );
+      }
+
+      await transaction.commit();
+
+      return successResponse(res, { 
+        booking, 
+        createdEvent: createdEvent ? {
+          id: createdEvent.id,
+          title: createdEvent.title,
+          eventDate: createdEvent.eventDate,
+          eventTime: createdEvent.eventTime,
+          ticketPrice: createdEvent.ticketPrice,
+          totalTickets: createdEvent.totalTickets
+        } : null
+      }, 'Booking status updated successfully');
     } catch (error) {
+      await transaction.rollback();
       logger.error('Update booking status error:', error);
       return errorResponse(res, 'Failed to update booking status', 500);
     }

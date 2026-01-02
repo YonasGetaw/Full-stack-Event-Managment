@@ -10,6 +10,17 @@ const logger = require('../utils/logger');
 const config = require('../config/env');
 const { Sequelize } = require('sequelize');
 
+const getProfileImageUrl = (profileImage) => {
+  if (!profileImage) return null;
+  // If it's already a full URL, return as is
+  if (profileImage.startsWith('http')) return profileImage;
+  // If it's a relative path starting with /uploads, construct full URL
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? (process.env.FRONTEND_URL || 'http://localhost:5173')
+    : 'http://localhost:4001';
+  return profileImage.startsWith('/') ? `${baseUrl}${profileImage}` : `${baseUrl}/${profileImage}`;
+};
+
 // Validation schemas
 const registerSchema = Joi.object({
   firstName: Joi.string().min(2).max(50).required(),
@@ -172,7 +183,7 @@ const authController = {
             lastName: user.lastName,
             email: user.email,
             phone: user.phone,
-            profileImage: user.profileImage,
+            profileImage: getProfileImageUrl(user.profileImage),
             role: user.role,
             status: user.status,
             emailVerified: user.emailVerified
@@ -292,7 +303,7 @@ const authController = {
           lastName: user.lastName,
           email: user.email,
           phone: user.phone,
-          profileImage: user.profileImage,
+          profileImage: getProfileImageUrl(user.profileImage),
           role: user.role,
           status: user.status,
           emailVerified: user.emailVerified,
@@ -358,7 +369,7 @@ const authController = {
           lastName: user.lastName,
           email: user.email,
           phone: user.phone,
-          profileImage: user.profileImage,
+          profileImage: getProfileImageUrl(user.profileImage),
           role: user.role,
           emailVerified: user.emailVerified,
           twoFactorEnabled: user.twoFactorEnabled
@@ -548,7 +559,7 @@ const authController = {
         address: user.address,
         city: user.city,
         dob: user.dob,
-        profileImage: user.profileImage,
+        profileImage: getProfileImageUrl(user.profileImage),
         role: user.role,
         status: user.status,
         emailVerified: user.emailVerified,

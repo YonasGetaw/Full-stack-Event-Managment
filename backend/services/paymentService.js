@@ -18,7 +18,6 @@ class PaymentService {
       if (booking.paymentStatus === 'paid') {
         throw new Error('Booking already paid');
       }
-
       const payment = await Payment.create({
         bookingId,
         amount: booking.priceCalculated,
@@ -57,29 +56,37 @@ class PaymentService {
         throw new Error('Event not found');
       }
 
+      const quantity = paymentData.quantity || 1;
+      const amount = Number(event.ticketPrice || 0) * quantity;
+
       const payment = await Payment.create(
         {
           bookingId: null,
           eventId,
           userId: userId || null,
-          amount: Number(event.ticketPrice || 0),
+          amount,
           currency: 'ETB',
           paymentMethod: paymentData.paymentMethod,
           phoneNumber: paymentData.phoneNumber,
           status: 'pending',
           transactionId: generateToken(8).toUpperCase(),
-          metadata: { type: 'event', title: event.title },
+          metadata: { 
+            type: 'event', 
+            title: event.title,
+            quantity: quantity,
+            ticketPrice: event.ticketPrice
+          },
         },
         { transaction }
       );
 
-      await transaction.commit();
-
-      await NotificationService.createAdminNotification(
+      await NotificationService.notifyAdmins(
         'payment_created',
-        `New payment created for event ${eventId}`,
-        { eventId, paymentId: payment.id, amount: payment.amount }
+        `New payment created for event ${eventId} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
+        { eventId, paymentId: payment.id, amount, quantity }
       );
+
+      await transaction.commit();
 
       return payment;
     } catch (error) {

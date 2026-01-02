@@ -37,6 +37,7 @@ const updateEventSchema = Joi.object({
 const proceedPaymentSchema = Joi.object({
   paymentMethod: Joi.string().valid('telebirr', 'cbe', 'abisiniya', 'abyssinia', 'commercial').required(),
   phoneNumber: Joi.string().min(10).max(15).optional(),
+  quantity: Joi.number().integer().min(1).max(10).default(1),
 });
 
 const eventController = {
@@ -246,17 +247,19 @@ const eventController = {
           where: { eventId: id, status: 'completed' },
         });
         const remaining = event.totalTickets - soldCount;
-        if (remaining <= 0) {
-          return errorResponse(res, 'No tickets remaining for this event', 400);
+        const requestedQuantity = value.quantity || 1;
+        if (remaining < requestedQuantity) {
+          return errorResponse(res, `Only ${remaining} tickets remaining for this event`, 400);
         }
       }
 
-      const { paymentMethod, phoneNumber } = value;
+      const { paymentMethod, phoneNumber, quantity = 1 } = value;
       const normalizedMethod = paymentMethod === 'abyssinia' ? 'abisiniya' : paymentMethod;
 
       const payment = await PaymentService.createEventPayment(id, req.user.id, {
         paymentMethod: normalizedMethod,
         phoneNumber,
+        quantity: quantity,
       });
 
       const instructions = await PaymentService.getPaymentInstructions(

@@ -4,6 +4,29 @@ const { successResponse, errorResponse } = require('../utils/response');
 const logger = require('../utils/logger');
 
 const notificationController = {
+  createAdminNotification: async (req, res) => {
+    try {
+      const { title, message, type } = req.body;
+
+      if (!title || !message || !type) {
+        return errorResponse(res, 'Title, message, and type are required', 400);
+      }
+
+      const notification = await Notification.create({
+        userId: null, // Admin notification
+        title,
+        message,
+        type,
+        read: false,
+      });
+
+      return successResponse(res, notification, 'Admin notification created successfully');
+    } catch (error) {
+      logger.error('Create admin notification error:', error);
+      return errorResponse(res, 'Failed to create admin notification', 500);
+    }
+  },
+
   getUserNotifications: async (req, res) => {
     try {
       const { page = 1, limit = 20 } = req.query;
