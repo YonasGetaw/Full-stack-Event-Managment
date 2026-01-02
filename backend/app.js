@@ -36,10 +36,11 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "http:", "http://localhost:*"],
     },
   },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false
 }));
 
 app.use(xss());
@@ -60,8 +61,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Static files with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // Logging
 app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev', {
@@ -81,7 +87,6 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/uploads/profile', express.static(path.join(__dirname, 'uploads/profile')));
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/gallery', galleryRoutes);
@@ -91,10 +96,16 @@ app.use('/api/admin-config', adminConfigRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Serve uploaded files
+// Serve uploaded files with comprehensive CORS headers
 app.get('/uploads/:folder/:filename', (req, res) => {
   const { folder, filename } = req.params;
   const filePath = path.join(__dirname, 'uploads', folder, filename);
+  
+  // Set CORS headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   
   res.sendFile(filePath, (err) => {
     if (err) {

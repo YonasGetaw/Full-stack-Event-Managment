@@ -6,6 +6,17 @@ const { successResponse, errorResponse, validationErrorResponse } = require('../
 const logger = require('../utils/logger');
 const { Sequelize } = require('sequelize');
 
+const getProfileImageUrl = (profileImage) => {
+  if (!profileImage) return null;
+  // If it's already a full URL, return as is
+  if (profileImage.startsWith('http')) return profileImage;
+  // If it's a relative path starting with /uploads, construct full URL
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? (process.env.FRONTEND_URL || 'http://localhost:5173')
+    : 'http://localhost:4001';
+  return profileImage.startsWith('/') ? `${baseUrl}${profileImage}` : `${baseUrl}/${profileImage}`;
+};
+
 // Validation schemas
 const updateProfileSchema = Joi.object({
   firstName: Joi.string().min(2).max(50),
@@ -41,7 +52,7 @@ const userController = {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
-        profileImage: user.profileImage,
+        profileImage: getProfileImageUrl(user.profileImage),
         address: user.address,
         city: user.city,
         dob: user.dob,
@@ -92,7 +103,7 @@ const userController = {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
-        profileImage: user.profileImage,
+        profileImage: getProfileImageUrl(user.profileImage),
         address: user.address,
         city: user.city,
         dob: user.dob
@@ -202,12 +213,12 @@ const userController = {
       if (io) {
         io.to(`user_${userId}`).emit('profile_image_updated', {
           userId,
-          profileImage: imageUrl
+          profileImage: getProfileImageUrl(imageUrl)
         });
       }
 
       return successResponse(res, {
-        profileImage: imageUrl
+        profileImage: getProfileImageUrl(imageUrl)
       }, 'Profile image uploaded successfully');
     } catch (error) {
       logger.error('Upload profile image error:', error);
